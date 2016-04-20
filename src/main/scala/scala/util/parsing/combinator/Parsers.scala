@@ -349,11 +349,11 @@ trait Parsers {
         val res2 = q(in)
 
         (res1, res2) match {
-          case (s1 @ Success(_, next1), s2 @ Success(_, next2)) => if (next2.pos < next1.pos) s1 else s2
+          case (s1 @ Success(_, next1: Input), s2 @ Success(_, next2: Input)) => if (next2.pos < next1.pos) s1 else s2
           case (s1 @ Success(_, _), _) => s1
           case (_, s2 @ Success(_, _)) => s2
           case (e1 @ Error(_, _), _) => e1
-          case (f1 @ Failure(_, next1), ns2 @ NoSuccess(_, next2)) => if (next2.pos < next1.pos) f1 else ns2
+          case (f1 @ Failure(_, next1: Input), ns2 @ NoSuccess(_, next2: Input)) => if (next2.pos < next1.pos) f1 else ns2
         }
       }
       override def toString = "|||"
@@ -721,7 +721,7 @@ trait Parsers {
     def continue(in: Input): ParseResult[List[T]] = {
       val p0 = p    // avoid repeatedly re-evaluating by-name parser
       @tailrec def applyp(in0: Input): ParseResult[List[T]] = p0(in0) match {
-        case Success(x, rest) => elems += x ; applyp(rest)
+        case Success(x: T, rest: Input) => elems += x ; applyp(rest)
         case e @ Error(_, _)  => e  // still have to propagate error
         case _                => Success(elems.toList, in0)
       }
@@ -730,7 +730,7 @@ trait Parsers {
     }
 
     first(in) match {
-      case Success(x, rest) => elems += x ; continue(rest)
+      case Success(x: T, rest: Input) => elems += x ; continue(rest)
       case ns: NoSuccess    => ns
     }
   }
@@ -753,7 +753,7 @@ trait Parsers {
       @tailrec def applyp(in0: Input): ParseResult[List[T]] =
         if (elems.length == num) Success(elems.toList, in0)
         else p0(in0) match {
-          case Success(x, rest) => elems += x ; applyp(rest)
+          case Success(x: T, rest: Input) => elems += x ; applyp(rest)
           case ns: NoSuccess    => ns
         }
 
@@ -853,7 +853,7 @@ trait Parsers {
    */
   def guard[T](p: => Parser[T]): Parser[T] = Parser { in =>
     p(in) match{
-      case s@ Success(s1,_) => Success(s1, in)
+      case s@ Success(s1: T,_) => Success(s1, in)
       case e => e
     }
   }
@@ -866,12 +866,14 @@ trait Parsers {
    *         result with the start position of the input it consumed,
    *         if it didn't already have a position.
    */
-  def positioned[T <: Positional](p: => Parser[T]): Parser[T] = Parser { in =>
+  def positioned[T <: Positional](p: => Parser[T]): Parser[T] = ???
+  /* Parser { in =>
     p(in) match {
       case Success(t, in1) => Success(if (t.pos == NoPosition) t setPos in.pos else t, in1)
       case ns: NoSuccess => ns
     }
   }
+  */
 
   /** A parser generator delimiting whole phrases (i.e. programs).
    *
@@ -885,7 +887,7 @@ trait Parsers {
   def phrase[T](p: Parser[T]) = new Parser[T] {
     def apply(in: Input) = lastNoSuccessVar.withValue(Some(None)) {
       p(in) match {
-        case s @ Success(out, in1) =>
+        case s @ Success(out, in1: Input) =>
           if (in1.atEnd)
             s
           else
@@ -911,8 +913,8 @@ trait Parsers {
    *    p1 ~ p2 ^^ { case a ~ b => a + b }
    *  }}}
    */
-  case class ~[+a, +b](_1: a, _2: b) {
-    override def toString = "("+ _1 +"~"+ _2 +")"
+  case class ~[+a, +b](__1: a, __2: b) {
+    override def toString = "("+ __1 +"~"+ __2 +")"
   }
 
   /** A parser whose `~` combinator disallows back-tracking.
